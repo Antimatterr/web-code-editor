@@ -6,8 +6,8 @@ import { fetchPlugin } from "./plugins/fetch-plugin";
 
 const App = () => {
   const [input, setInput] = useState(""); //input code from user
-  const [code, setCode] = useState(""); //transpilled and bundled code
   const ref = useRef<any>();
+  const iframeRef = useRef<any>();
 
   //start service promise which will be available in later time in the future
   const startService = async () => {
@@ -32,6 +32,8 @@ const App = () => {
       return;
     }
 
+    iframeRef.current.srcdocc = html;
+
     const result = await ref.current.build({
       entryPoints: ["index.js"],
       bundle: true,
@@ -43,10 +45,37 @@ const App = () => {
       },
     });
 
-    console.log(result);
-    // setCode(result.code);
-    setCode(result.outputFiles[0].text);
+    // setCode(result.outputFiles[0].text);
+    iframeRef.current.contentWindow.postMessage(
+      result.outputFiles[0].text,
+      "*"
+    );
   };
+
+  const html = `
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+  <div id="root"></div>
+    <script>
+      window.addEventListener('message', (event) => {
+        try {
+          eval(event.data)
+        } catch (error) {
+          const root = document.querySelector('#root');
+          root.innerHTML = '<div style="color: red;"><h4>Runtime Error</h4>' + error + '</div>';
+          console.error(error);
+        }
+
+      }, false)
+    </script>
+  </body>
+  </html>
+  `;
 
   return (
     <div>
@@ -61,7 +90,12 @@ const App = () => {
       <div>
         <button onClick={onclick}>Submit</button>
       </div>
-      <pre>{code}</pre>
+      <iframe
+        title="Code Preview"
+        ref={iframeRef}
+        srcDoc={html}
+        sandbox="allow-scripts"
+      ></iframe>
     </div>
   );
 };
